@@ -62,7 +62,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+docs/build/
 
 # PyBuilder
 target/
@@ -99,3 +99,13 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# PyTest
+.pytest_cache
+*.cache*
+
+# PyCharm
+.idea
+
+# Sublime
+*.sublime-*
