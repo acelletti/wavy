@@ -109,3 +109,6 @@ ENV/
 
 # Sublime
 *.sublime-*
+
+# Mac OS X
+*.DS_Store
