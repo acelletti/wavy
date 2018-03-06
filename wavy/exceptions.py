@@ -18,3 +18,9 @@ class WaveFileIsCorrupted(WavyException):
     Exception for when files are corrupted.
     """
     pass
+
+class WaveValueError(WavyException):
+    """
+    Exception for when the wrong value is passed to a function.
+    """
+    pass

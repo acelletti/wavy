@@ -14,7 +14,7 @@ def test_read(file):
     wave_file = read(file)
 
     print('\n', wave_file)
-    print(wave_file.info)
+    print(wave_file.tags)
 
     if wave_file.sample_width != 24:
         _, comp = scipy.io.wavfile.read(file)

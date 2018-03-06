@@ -13,7 +13,16 @@ FormatInfo = collections.namedtuple('FormatInfo', [
     'wBitsPerSample'
 ])
 
-InfoTags = collections.namedtuple('InfoTags', INFO_PROPS)
+
+
+def get_chunk(stream):
+    """
+    Get chunk for wave file (always little endian)
+    """
+    try:
+        return chunk.Chunk(stream, bigendian=False)
+    except EOFError:
+        raise wavy.WaveFileIsCorrupted('Reached end of file prematurely.')
 
 
 def check_head_chunk(stream):
@@ -156,8 +165,8 @@ def get_data_chunk(stream, info_tags={}):
         # found data
         if name == DATA:
             return chunk
-        elif name == b'LIST':
-            read_info_chunk(stream, chunk, info_tags)
+        elif name == LIST:
+            read_list_chunk(stream, chunk, info_tags)
         else:
             chunk.skip()
 
@@ -179,22 +188,22 @@ def get_string_from_bytes(bytes_list):
 
 def get_info_from_tags_dict(tags_dict):
     """
-    Create InfoTags tuple from parsed tag dictionary.
+    Create Tags tuple from parsed tag dictionary.
 
     Args:
         tags_dict: Tag Dictionary
 
     Returns:
-        InfoTags: The corresponding object.
+        Tags: The corresponding object.
 
     """
-    return InfoTags(**{
+    return wavy.Tags(**{
         value: tags_dict.get(key, '')
-        for key, value in INFO_TAGS_TO_PROPS.items()
+        for key, value in TAGS_TO_PROPS.items()
     })
 
 
-def read_info_chunk(stream, list_chunk, info_tags):
+def read_list_chunk(stream, list_chunk, info_tags):
     """
     Parse LIST chunk information into provided dictionary.
 
@@ -204,13 +213,13 @@ def read_info_chunk(stream, list_chunk, info_tags):
         info_tags: Dictionary where to store parsed tags.
 
     """
-    # get size of chunk to parse (size - sub-header)
-    bytes_to_parse = list_chunk.getsize() - 4
-
     # if sub header is not info, skip chunk
-    if b'INFO' != list_chunk.read(4):
+    if INFO != list_chunk.read(4):
         list_chunk.skip()
         return
+
+    # get size of chunk to parse (size - sub-header)
+    bytes_to_parse = list_chunk.getsize() - 4
 
     # parse whole chunk one at the time
     while bytes_to_parse:
@@ -285,9 +294,11 @@ def read_stream(stream, read_data=True):
 
     Args:
         stream: Byte stream
-        read_data:
+        read_data: Whether to read the file data or stop at the header.
 
     Returns:
+        tuple: (format, info, data) if read_data is True.
+        Otherwise (format, info, n_frames)
 
     """
     # check head chunk is valid

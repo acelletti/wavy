@@ -6,19 +6,21 @@ WaveFileInfo = collections.namedtuple('WaveFileInfo', [
     'sample_width',
     'framerate',
     'n_channels',
-    'n_frames'
+    'n_frames',
+    'tags'
 ])
 
 
-def read(file):
+def info(file):
     # get buffer reader, already opened for us
     with wavy.detail.get_stream_from_file(file, 'rb', io.BufferedReader) as \
             stream:
         # get file format & data
-        format, size = wavy.detail.read_stream(stream, read_data=False)
+        format, tags, size = wavy.detail.read_stream(stream, read_data=False)
 
     # return WaveFile obj
     return WaveFileInfo(sample_width=format.wBitsPerSample,
                         framerate=format.nSamplesPerSec,
                         n_channels=format.nChannels,
-                        n_frames=size // format.nBlockAlign)
+                        n_frames=size // format.nBlockAlign,
+                        tags=tags)

@@ -6,6 +6,13 @@ from wavy import *
 from wavy.detail import *
 
 
+def test_get_chunk_eof(mocker):
+    mocker.patch.object(chunk.Chunk, '__init__', side_effect=EOFError)
+    with pytest.raises(wavy.WaveFileIsCorrupted,
+                       match=esc('Reached end of file prematurely.')):
+        get_chunk(None)
+
+
 def test_check_head_chunk(mocker):
     """
     Test head chunk is read correctly
@@ -154,22 +161,30 @@ def test_check_format_info_fail(info, expected_msg):
     # test that it accept both cases (fact chunk is optional)
     [b'data', ],
     [b'data', b'fact'],
-    [b'data', b'foo ', b'fact']
+    [b'data', b'LIST', b'fact']
 ])
 def test_get_data_chunk(chunk_names, mocker):
     """
     Test data chunk is read correctly
     """
     # mock Chunk methods
-    mocker.patch.object(chunk.Chunk, '__init__', return_value=None)
-    mocker.patch.object(chunk.Chunk, 'getname',
-                        side_effect=lambda: chunk_names.pop())
-    mocker.patch.object(chunk.Chunk, 'skip')
+    mock_chunk = mocker.MagicMock()
+    mock_chunk.skip.return_value = None
+    mock_chunk.getname.side_effect = lambda: chunk_names.pop()
 
-    assert isinstance(get_data_chunk(None), chunk.Chunk)
+    get_chunk = mocker.patch('wavy.detail.read.get_chunk', return_value=mock_chunk)
+
+    # list chunk parsing
+    has_list = b'LIST' in chunk_names
+    read_list_chunk = mocker.patch('wavy.detail.read.read_list_chunk')
+
+    assert get_data_chunk(None) == mock_chunk
     # check all called as expected
-    chunk.Chunk.__init__.assert_called_with(None, bigendian=False)
-    chunk.Chunk.getname.assert_called_with()
+    get_chunk.assert_called_with(None)
+    mock_chunk.getname.assert_called_with()
+
+    if has_list:
+        read_list_chunk.assert_called_with(None, mock_chunk, {})
 
 
 @pytest.mark.parametrize('format, dtype', [
@@ -215,7 +230,7 @@ def test_get_data_from_chunk(format, dtype, mocker):
 @pytest.mark.parametrize('format', [
     # single channel (mono)
     FormatInfo(wFormatTag=1, nChannels=1, nSamplesPerSec=1,
-                nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24),
+               nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24),
     # multi-channel (stereo)
     FormatInfo(wFormatTag=1, nChannels=2, nSamplesPerSec=1,
                nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24)
@@ -227,14 +242,14 @@ def test_get_data_from_chunk_24_bit(format, mocker):
     # mock Chunk methods
     chunk = mocker.MagicMock()
     chunk.getsize.return_value = format.nBlockAlign
-    chunk.read.return_value = b'\n\x00\x00' # 10 in int 24
+    chunk.read.return_value = b'\n\x00\x00'  # 10 in int 24
 
     data = mocker.MagicMock()
     data.reshape.return_value = data
 
     unpack = mocker.patch.object(struct, 'unpack', return_value=[10])
     array = mocker.patch.object(numpy, 'array',
-                                     return_value=data)
+                                return_value=data)
 
     assert get_data_from_chunk(chunk, format) is data
     # check all called as expected
@@ -249,7 +264,7 @@ def test_get_data_from_chunk_24_bit(format, mocker):
 @pytest.mark.parametrize('format', [
     # single channel (mono)
     FormatInfo(wFormatTag=1, nChannels=1, nSamplesPerSec=1,
-                nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24),
+               nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24),
     # multi-channel (stereo)
     FormatInfo(wFormatTag=1, nChannels=2, nSamplesPerSec=1,
                nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24)
@@ -263,10 +278,120 @@ def test_get_data_from_chunk_raises_error_if_corrupt(format, mocker):
     chunk.getsize.return_value = 1
 
     format = FormatInfo(wFormatTag=1, nChannels=2, nSamplesPerSec=1,
-               nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24)
+                        nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24)
 
     with pytest.raises(WaveFileIsCorrupted,
                        match=esc('Data size does not match frame '
                                  'size of 24 bits')):
         get_data_from_chunk(chunk, format)
+
+
+mock_tags = {
+    'tags': [b'foo', b'bar\x00'],
+    'values': [b'value2\x00\x00', b'value1\x00\x00\x00\x00'],
+}
+
+
+def test_read_list_chunk(mocker):
+    """
+    Test info is read correctly from list chunk
+    """
+    chunk = mocker.MagicMock()
+    chunk.getsize.return_value = 36
+    chunk.read.return_value = b'INFO'
+
+    sub_chunk = mocker.MagicMock()
+    sub_chunk.getsize.return_value = 8
+    sub_chunk.getname.side_effect = lambda: mock_tags['tags'].pop()
+    sub_chunk.read.side_effect = lambda: mock_tags['values'].pop()
+
+    mocker.patch('wavy.detail.read.get_chunk', return_value=sub_chunk)
+    info_dict = {}
+    read_list_chunk('stream', chunk, info_dict)
+
+    assert info_dict == {'bar': 'value1', 'foo': 'value2'}
+
+
+def test_read_list_chunk_not_info(mocker):
+    """
+    Test list chunk is skipped if not info
+    """
+    chunk = mocker.MagicMock()
+    chunk.read.return_value = b'foo '
+    chunk.skip.return_value = None
+
+    read_list_chunk(None, chunk, None)
+
+    chunk.skip.assert_called_with()
+
+
+@pytest.mark.parametrize('tags, expected', [
+    ({},
+     Tags()
+     ),
+    ({
+         'INAM': 'name', 'ISBJ': 'subject', 'IART': 'artist', 'ICMT': 'comment',
+         'IKEY': 'keywords', 'ISFT': 'software', 'IENG': 'engineer', 'ITCH': 'technician',
+         'ICRD': 'creation_date', 'GENR': 'genre', 'ICOP': 'copyright'
+     },
+     Tags(name='name', subject='subject', artist='artist', comment='comment',
+          keywords='keywords', software='software', engineer='engineer',
+          technician='technician', creation_date='creation_date',
+          genre='genre', copyright='copyright')
+    )
+])
+def test_get_info_from_tags_dict(tags, expected):
+    """
+    Test that info is copied in the right field for Tags
+    """
+    assert get_info_from_tags_dict(tags) == expected
+
+
+@pytest.mark.parametrize('read_data, tags', [
+    (True, {}),
+    (True, {'foo':'bar'}),
+    (False, {}),
+    (False, {'foo':'bar'})
+])
+def test_read_stream(read_data, tags, mocker):
+    """
+    Test that read stream return correct data
+    """
+
+    chunk = mocker.MagicMock()
+    chunk.getsize.return_value = 8
+
+    def get_data_chunk_mck(x, y):
+        y.update(tags)
+        return chunk
+
+    check_head_chunk = mocker.patch('wavy.detail.read.check_head_chunk')
+    get_fmt_chunk = mocker.patch('wavy.detail.read.get_fmt_chunk', return_value='format')
+    check_format_info = mocker.patch('wavy.detail.read.check_format_info')
+
+
+    get_data_chunk = mocker.patch('wavy.detail.read.get_data_chunk', side_effect=get_data_chunk_mck)
+
+    get_info_from_tags_dict = mocker.patch('wavy.detail.read.get_info_from_tags_dict', return_value='info')
+    get_data_from_chunk = mocker.patch('wavy.detail.read.get_data_from_chunk', return_value='data')
+
+    result = read_stream('stream', read_data)
+
+    check_head_chunk.assert_called_with('stream')
+    get_fmt_chunk.assert_called_with('stream')
+    check_format_info.assert_called_with('format')
+    get_data_chunk.assert_called_with('stream', tags)
+
+    if tags:
+        get_info_from_tags_dict.assert_called_with(tags)
+
+    if read_data:
+        get_data_from_chunk.assert_called_with(chunk, 'format')
+
+    info = 'info' if tags else None
+
+    if read_data:
+        assert result == ('format', info, 'data')
+    else:
+        assert result == ('format', info, 8)
 

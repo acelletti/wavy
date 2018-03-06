@@ -16,8 +16,9 @@ WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
 
 FMT_CHUNK_SIZES = [16, 18, 40]
+SUPPORTED_SAMPLE_WIDTH = [8, 16, 24, 32]
 
-INFO_TAGS_TO_PROPS = {
+TAGS_TO_PROPS = {
     'INAM': 'name',             # The name of the file (or "project").
     'ISBJ': 'subject',          # The subject.
     'IART': 'artist',           # The artist who created this.
@@ -31,7 +32,7 @@ INFO_TAGS_TO_PROPS = {
     'ICOP': 'copyright'         # The copyright information.
 }
 
-INFO_PROPS = [
+TAG_PROPS = [
     'name',
     'subject',
     'artist',
@@ -45,14 +46,10 @@ INFO_PROPS = [
     'copyright'
 ]
 
-def get_chunk(stream):
-    """
-    Get chunk for wave file (always little endian)
-    """
-    try:
-        return chunk.Chunk(stream, bigendian=False)
-    except EOFError:
-        raise wavy.WaveFileIsCorrupted('Reached end of file prematurely.')
+def check_sample_width_supported(sample_width):
+    if not sample_width in SUPPORTED_SAMPLE_WIDTH:
+        raise wavy.WaveFileNotSupported(
+            "Sample width of '{}' is not supported.".format(sample_width))
 
 
 def get_stream_from_file(file, flag, stream_class):
