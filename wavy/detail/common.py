@@ -17,10 +17,33 @@ WAVE_FORMAT_EXTENSIBLE = 0xFFFE
 
 FMT_CHUNK_SIZES = [16, 18, 40]
 
-INTERMEDIATE_OPTIONAL_CHUNKS = [
-    FACT, LIST, INFO
-]
+INFO_TAGS_TO_PROPS = {
+    'INAM': 'name',             # The name of the file (or "project").
+    'ISBJ': 'subject',          # The subject.
+    'IART': 'artist',           # The artist who created this.
+    'ICMT': 'comment',          # A text comment.
+    'IKEY': 'keywords',         # The keywords for the project or file.
+    'ISFT': 'software',         # The software used to create the file.
+    'IENG': 'engineer',         # The engineer.
+    'ITCH': 'technician',       # The technician.
+    'ICRD': 'creation_date',    # The creation date.
+    'GENR': 'genre',            # Genre of content.
+    'ICOP': 'copyright'         # The copyright information.
+}
 
+INFO_PROPS = [
+    'name',
+    'subject',
+    'artist',
+    'comment',
+    'keywords',
+    'software',
+    'engineer',
+    'technician',
+    'creation_date',
+    'genre',
+    'copyright'
+]
 
 def get_chunk(stream):
     """

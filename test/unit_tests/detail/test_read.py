@@ -154,7 +154,7 @@ def test_check_format_info_fail(info, expected_msg):
     # test that it accept both cases (fact chunk is optional)
     [b'data', ],
     [b'data', b'fact'],
-    [b'data', b'LIST', b'fact']
+    [b'data', b'foo ', b'fact']
 ])
 def test_get_data_chunk(chunk_names, mocker):
     """

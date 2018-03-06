@@ -13,6 +13,8 @@ FormatInfo = collections.namedtuple('FormatInfo', [
     'wBitsPerSample'
 ])
 
+InfoTags = collections.namedtuple('InfoTags', INFO_PROPS)
+
 
 def check_head_chunk(stream):
     """
@@ -133,7 +135,7 @@ def check_format_info(info):
             f"Actual: {info.nAvgBytesPerSec}.")
 
 
-def get_data_chunk(stream):
+def get_data_chunk(stream, info_tags={}):
     """
     Reads the data chunk from the stream.
 
@@ -154,7 +156,70 @@ def get_data_chunk(stream):
         # found data
         if name == DATA:
             return chunk
-        chunk.skip()
+        elif name == b'LIST':
+            read_info_chunk(stream, chunk, info_tags)
+        else:
+            chunk.skip()
+
+
+def get_string_from_bytes(bytes_list):
+    """
+    Get string from bytes list.
+
+    Args:
+        bytes_list: Bytes list.
+
+    Returns:
+        str: The corresponding string.
+
+    """
+    # remove padding at the end
+    return bytes_list.decode().rstrip('\x00')
+
+
+def get_info_from_tags_dict(tags_dict):
+    """
+    Create InfoTags tuple from parsed tag dictionary.
+
+    Args:
+        tags_dict: Tag Dictionary
+
+    Returns:
+        InfoTags: The corresponding object.
+
+    """
+    return InfoTags(**{
+        value: tags_dict.get(key, '')
+        for key, value in INFO_TAGS_TO_PROPS.items()
+    })
+
+
+def read_info_chunk(stream, list_chunk, info_tags):
+    """
+    Parse LIST chunk information into provided dictionary.
+
+    Args:
+        stream: Byte stream.
+        list_chunk: The LIST chunk.
+        info_tags: Dictionary where to store parsed tags.
+
+    """
+    # get size of chunk to parse (size - sub-header)
+    bytes_to_parse = list_chunk.getsize() - 4
+
+    # if sub header is not info, skip chunk
+    if b'INFO' != list_chunk.read(4):
+        list_chunk.skip()
+        return
+
+    # parse whole chunk one at the time
+    while bytes_to_parse:
+        chunk = get_chunk(stream)
+        # remove chunk size from bytes to parse (size + chunk header)
+        bytes_to_parse -= chunk.getsize() + 8
+        # insert tag, value into dictionary
+        tag = get_string_from_bytes(chunk.getname())
+        info_tags[tag] = get_string_from_bytes(chunk.read())
 
 
 def read_24_bit_stream(chunk, size):
@@ -216,20 +281,34 @@ def get_data_from_chunk(chunk, format):
 
 
 def read_stream(stream, read_data=True):
+    """
+
+    Args:
+        stream: Byte stream
+        read_data:
+
+    Returns:
+
+    """
     # check head chunk is valid
     check_head_chunk(stream)
     # get file format from chunk
     format = get_fmt_chunk(stream)
     # make sure format info is correct
     check_format_info(format)
+    # create info dict to store optional info
+    info_tags = {}
     # get data chunk
-    data_chunk = get_data_chunk(stream)
+    data_chunk = get_data_chunk(stream, info_tags)
+    # build info obj from tags (if any was found)
+    info = get_info_from_tags_dict(info_tags) \
+        if info_tags else None
 
     if not read_data:
         # stop here and return info
-        return format, data_chunk.getsize()
+        return format, info, data_chunk.getsize()
 
     # parse data from chunk
     data = get_data_from_chunk(data_chunk, format)
 
-    return format, data
+    return format, info, data

@@ -8,9 +8,10 @@ def read(file):
     with wavy.detail.get_stream_from_file(file, 'rb', io.BufferedReader) as \
             stream:
         # get file format & data
-        format, data = wavy.detail.read_stream(stream)
+        format, info, data = wavy.detail.read_stream(stream)
 
     # return WaveFile obj
     return wavy.WaveFile(sample_width=format.wBitsPerSample,
                          framerate=format.nSamplesPerSec,
-                         data=data)
+                         data=data,
+                         info=info)

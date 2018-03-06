@@ -21,13 +21,18 @@ class WaveFile(object):
     def data(self):
         return self._data
 
-    def __init__(self, sample_width, framerate, data):
+    @property
+    def info(self):
+        return self._info
+
+    def __init__(self, sample_width, framerate, data, info=None):
         # copy info
         self._sample_width = sample_width
         self._framerate = framerate
         # extract info from array
         self._n_frames, self._n_channels = data.shape
         self._data = data
+        self._info = info
 
     def __repr__(self):
         return f"WaveFile(sample_width={self.sample_width}, " \
