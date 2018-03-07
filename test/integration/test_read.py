@@ -13,9 +13,6 @@ def get_all_files(dir_name):
 def test_read(file):
     wave_file = read(file)
 
-    print('\n', wave_file)
-    print(wave_file.tags)
-
     if wave_file.sample_width != 24:
         _, comp = scipy.io.wavfile.read(file)
         assert numpy.array_equal(wave_file.data, comp)
