@@ -5,5 +5,11 @@ python:
 
 install:
   - pip install -r requirements.txt
+  - pip install coverage coveralls
 
-script: pytest -s test
+script:
+  - coverage run -m --branch pytest -vs test
+  - coverage report -m
+
+after_success:
+  - coveralls
