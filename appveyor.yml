@@ -1,0 +1,39 @@
+
+environment:
+  matrix:
+    # AppVeyor installed Python versions
+    # http://www.appveyor.com/docs/installed-software#python
+    - PYTHON_INSTALL: "C:\\Python36"
+
+install:
+  # Prepend Python installation to PATH
+  - set PATH=%PYTHON_INSTALL%;%PATH%
+
+  # Prepend Python scripts to PATH (e.g. pip, py.test, pylint)
+  - set PATH=%PYTHON_INSTALL%\\Scripts;%PATH%
+
+  # Upgrade the Python build tools
+  - pip install -U pip setuptools wheel
+
+  # Check pip version
+  - python -m pip install --upgrade pip setuptools wheel
+  - pip --version
+
+  # Install dependencies
+  - pip install -r requirements.txt
+
+# to run your custom scripts instead of automatic MSBuild
+build_script:
+  - python --version
+
+test_script:
+  # Run test files via py.test and generate JUnit XML. Then push test results
+  # to appveyor. The plugin pytest-cov takes care of coverage.
+  - ps: |
+      & python -m pytest -vs test --junitxml .\unittests.xml
+      $testsExitCode = $lastexitcode
+
+      $wc = New-Object 'System.Net.WebClient'
+      $wc.UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\unittests.xml))
+
+      if ($testsExitCode -ne 0) {exit $testsExitCode}
