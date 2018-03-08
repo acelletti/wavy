@@ -4,6 +4,9 @@
 .. image:: https://coveralls.io/repos/github/acelletti/wavy/badge.svg?branch=travisci
    :target: https://coveralls.io/github/acelletti/wavy?branch=travisci
 
+.. image:: https://img.shields.io/appveyor/tests/NZSmartie/coap-net-iu0to.svg
+   :target: https://ci.appveyor.com/project/acelletti/wavy/build/tests
+
 Wavy
 =====
 Module for working with wave files
