@@ -3,6 +3,7 @@ import numpy
 import struct
 import wavy
 from .common import *
+from .stream_handler import *
 
 FormatInfo = collections.namedtuple('FormatInfo', [
     'wFormatTag',
@@ -25,13 +26,17 @@ def get_chunk(stream):
         raise wavy.WaveFileIsCorrupted('Reached end of file prematurely.')
 
 
-def check_head_chunk(stream):
+def get_stream_handler(stream):
     """
     Reads the master chunk from the stream and checks that it matches the
-    specifications for Wave files.
+    specifications for Wave files. Returns StreamHandler with the correct
+    endianness set based on file header (RIFF or RIFX).
 
     Args:
-        stream: The stream to read
+        stream: The stream to read.
+
+    Returns:
+        StreamHandler: handler with correct endianness set.
 
     Raises:
         wavy.WaveFileIsCorrupted: If file is corrupted.
@@ -39,17 +44,24 @@ def check_head_chunk(stream):
         specifications.
 
     """
-    chunk = get_chunk(stream)
-    # the master chunk should always be RIFF
-    if chunk.getname() != RIFF:
-        raise wavy.WaveFileNotSupported('File does not start with RIFF ID.')
+    header = stream.read(4)
+    # the master chunk should always be RIFF or RIFX
+    if header not in SUPPORTED_HEADERS:
+        raise wavy.WaveFileNotSupported("Unsupported header for "
+                                        "file '{}'.".format(header.decode()))
+
+    handler = StreamHandler(little_endian=header == RIFF)
+    # this will be the size of the chunk
+    stream.read(4)
     # WAVEID should always be WAVE
     if stream.read(4) != WAVE:
         raise wavy.WaveFileNotSupported('File does not appear to be a WAVE '
                                         'file.')
 
+    return handler
 
-def get_sub_format(fmt_chunk):
+
+def get_sub_format(fmt_chunk, handler):
     """
     Read first two bytes of subFormat tag from fmt_chunk (indicates the actual
     format for extended encoding).
@@ -60,10 +72,10 @@ def get_sub_format(fmt_chunk):
         int: First two bytes of subFormat tag.
     """
     fmt_chunk.seek(24)
-    return struct.unpack_from('<H', fmt_chunk.read(2))[0]
+    return handler.read('H', fmt_chunk.read(2))[0]
 
 
-def get_fmt_chunk(stream):
+def get_fmt_chunk(stream, handler):
     """
     Reads the format chunk from the stream, checks that it matches the
     specifications for Wave files and returns format information.
@@ -97,7 +109,7 @@ def get_fmt_chunk(stream):
             'Format chunk is of unexpected size: {}.'.format(chunk.getsize()))
 
     # extract common chunk info into tuple
-    info = FormatInfo(*struct.unpack_from('<HHLLHH', chunk.read(16)))
+    info = FormatInfo(*handler.read('HHLLHH', chunk.read(16)))
 
     # we only support PCM
     if info.wFormatTag == WAVE_FORMAT_PCM:
@@ -108,7 +120,7 @@ def get_fmt_chunk(stream):
     # WAVE_FORMAT_PCM as subFormat
     if info.wFormatTag == WAVE_FORMAT_EXTENSIBLE and \
             chunk.getsize() == 40 and \
-            get_sub_format(chunk) == WAVE_FORMAT_PCM:
+            get_sub_format(chunk, handler) == WAVE_FORMAT_PCM:
         chunk.skip()
         # replace WAVE_FORMAT_PCM with PCM and return info
         return FormatInfo(WAVE_FORMAT_PCM, *list(info)[1:])
@@ -231,28 +243,7 @@ def read_list_chunk(stream, list_chunk, info_tags):
         info_tags[tag] = get_string_from_bytes(chunk.read())
 
 
-def read_24_bit_stream(chunk, size):
-    """
-    Read chunk for 24 bit format (exception since we cannot use builtin
-    functionality).
-
-    Args:
-        chunk: Data chunk
-        size: Actual size (size / 3 bytes)
-
-    Returns:
-        numpy.array: Data read from chunk
-
-    """
-    data = []
-    for _ in range(size):
-        # need to pad the last bytes so that we can read 24 bit as 32
-        data += struct.unpack('<I', chunk.read(3) + b'\x00')
-    # convert to numpy array
-    return numpy.array(data)
-
-
-def get_data_from_chunk(chunk, format):
+def get_data_from_chunk(chunk, format, handler):
     """
     Read data from data chunk.
     Args:
@@ -272,17 +263,10 @@ def get_data_from_chunk(chunk, format):
                                        f" {format.wBitsPerSample} bits")
 
     # number of bytes for data type to be parsed
-    dtype = format.wBitsPerSample // 8
+    n_bytes = format.wBitsPerSample // 8
 
-    # great, if not 24 we can use numpy built in parser
-    if format.wBitsPerSample != 24:
-        data = numpy.fromstring(chunk.read(size),
-                                # if 8 bits is unsigned, otherwise signed
-                                dtype=f'<i{dtype}' if dtype > 1 else '<u1')
-    else:
-        # this is a corner case that, as of now, neither numpy nor struct is
-        # capable of handling, so we have to do it ourselves
-        data = read_24_bit_stream(chunk, size // dtype)
+    # read data from raw
+    data = handler.read_data(chunk, size, n_bytes)
 
     # check if there is more than one channel, if so reshape
     return data if format.nChannels == 1 \
@@ -302,9 +286,9 @@ def read_stream(stream, read_data=True):
 
     """
     # check head chunk is valid
-    check_head_chunk(stream)
+    handler = get_stream_handler(stream)
     # get file format from chunk
-    format = get_fmt_chunk(stream)
+    format = get_fmt_chunk(stream, handler)
     # make sure format info is correct
     check_format_info(format)
     # create info dict to store optional info
@@ -320,6 +304,6 @@ def read_stream(stream, read_data=True):
         return format, info, data_chunk.getsize()
 
     # parse data from chunk
-    data = get_data_from_chunk(data_chunk, format)
+    data = get_data_from_chunk(data_chunk, format, handler)
 
     return format, info, data

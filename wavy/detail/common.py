@@ -5,12 +5,16 @@ import numpy
 import wavy
 
 RIFF = b'RIFF'
+RIFX = b'RIFX'
+
 WAVE = b'WAVE'
 FMT = b'fmt '
 DATA = b'data'
 FACT = b'fact'
 LIST = b'LIST'
 INFO = b'INFO'
+
+SUPPORTED_HEADERS = [RIFF, RIFX]
 
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
@@ -19,17 +23,17 @@ FMT_CHUNK_SIZES = [16, 18, 40]
 SUPPORTED_SAMPLE_WIDTH = [8, 16, 24, 32]
 
 TAGS_TO_PROPS = {
-    'INAM': 'name',             # The name of the file (or "project").
-    'ISBJ': 'subject',          # The subject.
-    'IART': 'artist',           # The artist who created this.
-    'ICMT': 'comment',          # A text comment.
-    'IKEY': 'keywords',         # The keywords for the project or file.
-    'ISFT': 'software',         # The software used to create the file.
-    'IENG': 'engineer',         # The engineer.
-    'ITCH': 'technician',       # The technician.
-    'ICRD': 'creation_date',    # The creation date.
-    'GENR': 'genre',            # Genre of content.
-    'ICOP': 'copyright'         # The copyright information.
+    'INAM': 'name',  # The name of the file (or "project").
+    'ISBJ': 'subject',  # The subject.
+    'IART': 'artist',  # The artist who created this.
+    'ICMT': 'comment',  # A text comment.
+    'IKEY': 'keywords',  # The keywords for the project or file.
+    'ISFT': 'software',  # The software used to create the file.
+    'IENG': 'engineer',  # The engineer.
+    'ITCH': 'technician',  # The technician.
+    'ICRD': 'creation_date',  # The creation date.
+    'GENR': 'genre',  # Genre of content.
+    'ICOP': 'copyright'  # The copyright information.
 }
 
 TAG_PROPS = [
@@ -45,6 +49,7 @@ TAG_PROPS = [
     'genre',
     'copyright'
 ]
+
 
 def check_sample_width_supported(sample_width):
     if not sample_width in SUPPORTED_SAMPLE_WIDTH:

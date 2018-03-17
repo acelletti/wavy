@@ -13,49 +13,54 @@ def test_get_chunk_eof(mocker):
         get_chunk(None)
 
 
-def test_check_head_chunk(mocker):
+@pytest.mark.parametrize('content, le', [
+    ([b'WAVE', 0, b'RIFF'], True),
+    ([b'WAVE', 0, b'RIFX'], False)
+])
+def test_get_stream_handler(content, le, mocker):
     """
     Test head chunk is read correctly
     """
-    # mock Chunk methods
-    mocker.patch.object(chunk.Chunk, '__init__', return_value=None)
-    mocker.patch.object(chunk.Chunk, 'getname', return_value=b'RIFF')
     # mock stream methods
     stream = mocker.MagicMock()
-    stream.read.return_value = b'WAVE'
+    stream.read.side_effect = lambda x: content.pop()
 
-    check_head_chunk(stream)
+    handler = get_stream_handler(stream)
     # check all called as expected
-    chunk.Chunk.__init__.assert_called_with(stream, bigendian=False)
-    chunk.Chunk.getname.assert_called_with()
-    stream.read.assert_called_with(4)
+    stream.read.assert_has_calls([mocker.call(4),
+                                  mocker.call(4),
+                                  mocker.call(4)])
+
+    assert isinstance(handler, StreamHandler)
+    assert handler.little_endian == le
 
 
 def test_check_head_chunk_wrong_tag(mocker):
     """
     Test exception is raised when head tag has unknown type.
     """
-    # mock Chunk methods
-    mocker.patch.object(chunk.Chunk, '__init__', return_value=None)
-    mocker.patch.object(chunk.Chunk, 'getname', return_value=b'FOOL')
+    # mock stream methods
+    stream = mocker.MagicMock()
+    stream.read.return_value = b'XFIR'
+
     with pytest.raises(WaveFileNotSupported,
-                       match=esc('File does not start with RIFF ID.')):
-        check_head_chunk(None)
+                       match=esc("Unsupported header for "
+                                 "file 'XFIR'.")):
+        get_stream_handler(stream)
 
 
 def test_check_head_chunk_wrong_type(mocker):
     """
     Test exception is raised when wave type tag has unknown type.
     """
-    # mock Chunk methods
-    mocker.patch.object(chunk.Chunk, '__init__', return_value=None)
-    mocker.patch.object(chunk.Chunk, 'getname', return_value=b'RIFF')
+    content = [b'BARB', 0, b'RIFF']
     # mock stream methods
     stream = mocker.MagicMock()
-    stream.read.return_value = b'BARB'
+    stream.read.side_effect = lambda x: content.pop()
+
     with pytest.raises(WaveFileNotSupported,
                        match=esc('File does not appear to be a WAVE file.')):
-        check_head_chunk(stream)
+        get_stream_handler(stream)
 
 
 @pytest.mark.parametrize('fmt_names, chunk_size, format_tag, sub_format_tag', [
@@ -86,7 +91,7 @@ def test_get_fmt_chunk(fmt_names, chunk_size, format_tag,
                         side_effect=lambda _: read_list.pop())
     mocker.patch.object(chunk.Chunk, 'skip')
 
-    assert get_fmt_chunk(None) == FormatInfo(WAVE_FORMAT_PCM, 1, 2, 3, 4, 5)
+    assert get_fmt_chunk(None, StreamHandler(True)) == FormatInfo(WAVE_FORMAT_PCM, 1, 2, 3, 4, 5)
     # check all called as expected
     chunk.Chunk.__init__.assert_called_with(None, bigendian=False)
     chunk.Chunk.getname.assert_called_with()
@@ -139,7 +144,7 @@ def test_get_fmt_chunk_fail(fmt_names, chunk_size, format_tag,
                         side_effect=lambda _: read_list.pop())
 
     with pytest.raises(exception_type, match=esc(error_msg)):
-        get_fmt_chunk(None)
+        get_fmt_chunk(None, StreamHandler(True))
 
 
 def test_check_format_info_pass():
@@ -208,55 +213,21 @@ def test_get_data_from_chunk(format, dtype, mocker):
     Test data is read correctly from chunk
     """
     # mock Chunk methods
+    data_size = 10 * format.nBlockAlign
+
     chunk = mocker.MagicMock()
-    chunk.getsize.return_value = format.nBlockAlign
-    chunk.read.return_value = 'bytes'
+    chunk.getsize.return_value = data_size
 
     data = mocker.MagicMock()
     data.reshape.return_value = data
 
-    fromstring = mocker.patch.object(numpy, 'fromstring',
-                                     return_value=data)
+    handler = mocker.MagicMock()
+    handler.read_data.return_value = data
 
-    assert get_data_from_chunk(chunk, format) is data
+    assert get_data_from_chunk(chunk, format, handler) is data
     # check all called as expected
     chunk.getsize.assert_called_with()
-    chunk.read.assert_called_with(format.nBlockAlign)
-    fromstring.assert_called_with('bytes', dtype=dtype)
-    if format.nChannels > 1:
-        data.reshape.assert_called_with(-1, format.nChannels)
-
-
-@pytest.mark.parametrize('format', [
-    # single channel (mono)
-    FormatInfo(wFormatTag=1, nChannels=1, nSamplesPerSec=1,
-               nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24),
-    # multi-channel (stereo)
-    FormatInfo(wFormatTag=1, nChannels=2, nSamplesPerSec=1,
-               nAvgBytesPerSec=6, nBlockAlign=6, wBitsPerSample=24)
-])
-def test_get_data_from_chunk_24_bit(format, mocker):
-    """
-    Test data is read correctly from chunk for 24 bit
-    """
-    # mock Chunk methods
-    chunk = mocker.MagicMock()
-    chunk.getsize.return_value = format.nBlockAlign
-    chunk.read.return_value = b'\n\x00\x00'  # 10 in int 24
-
-    data = mocker.MagicMock()
-    data.reshape.return_value = data
-
-    unpack = mocker.patch.object(struct, 'unpack', return_value=[10])
-    array = mocker.patch.object(numpy, 'array',
-                                return_value=data)
-
-    assert get_data_from_chunk(chunk, format) is data
-    # check all called as expected
-    chunk.getsize.assert_called_with()
-    chunk.read.assert_called_with(3)
-    unpack.assert_called_with('<I', b'\n\x00\x00\x00')
-    array.assert_called_with([10, 10])
+    handler.read_data.assert_called_with(chunk, data_size, format.wBitsPerSample // 8)
     if format.nChannels > 1:
         data.reshape.assert_called_with(-1, format.nChannels)
 
@@ -283,7 +254,7 @@ def test_get_data_from_chunk_raises_error_if_corrupt(format, mocker):
     with pytest.raises(WaveFileIsCorrupted,
                        match=esc('Data size does not match frame '
                                  'size of 24 bits')):
-        get_data_from_chunk(chunk, format)
+        get_data_from_chunk(chunk, format, None)
 
 
 mock_tags = {
@@ -349,9 +320,9 @@ def test_get_info_from_tags_dict(tags, expected):
 
 @pytest.mark.parametrize('read_data, tags', [
     (True, {}),
-    (True, {'foo':'bar'}),
+    (True, {'foo': 'bar'}),
     (False, {}),
-    (False, {'foo':'bar'})
+    (False, {'foo': 'bar'})
 ])
 def test_read_stream(read_data, tags, mocker):
     """
@@ -365,10 +336,9 @@ def test_read_stream(read_data, tags, mocker):
         y.update(tags)
         return chunk
 
-    check_head_chunk = mocker.patch('wavy.detail.read.check_head_chunk')
+    check_head_chunk = mocker.patch('wavy.detail.read.get_stream_handler', return_value='stream_handler')
     get_fmt_chunk = mocker.patch('wavy.detail.read.get_fmt_chunk', return_value='format')
     check_format_info = mocker.patch('wavy.detail.read.check_format_info')
-
 
     get_data_chunk = mocker.patch('wavy.detail.read.get_data_chunk', side_effect=get_data_chunk_mck)
 
@@ -378,7 +348,7 @@ def test_read_stream(read_data, tags, mocker):
     result = read_stream('stream', read_data)
 
     check_head_chunk.assert_called_with('stream')
-    get_fmt_chunk.assert_called_with('stream')
+    get_fmt_chunk.assert_called_with('stream', 'stream_handler')
     check_format_info.assert_called_with('format')
     get_data_chunk.assert_called_with('stream', tags)
 
@@ -386,7 +356,7 @@ def test_read_stream(read_data, tags, mocker):
         get_info_from_tags_dict.assert_called_with(tags)
 
     if read_data:
-        get_data_from_chunk.assert_called_with(chunk, 'format')
+        get_data_from_chunk.assert_called_with(chunk, 'format', 'stream_handler')
 
     info = 'info' if tags else None
 
@@ -394,4 +364,3 @@ def test_read_stream(read_data, tags, mocker):
         assert result == ('format', info, 'data')
     else:
         assert result == ('format', info, 8)
-
