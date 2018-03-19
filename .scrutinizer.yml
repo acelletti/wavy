@@ -1,0 +1,16 @@
+checks:
+    python:
+        code_rating: true
+        duplicate_code: true
+
+filter:
+    excluded_paths:
+        - docs/*
+        - test/*
+
+build:
+    environment:
+        python: 3.6.0
+    tests:
+        override:
+            - pytest -vs test
