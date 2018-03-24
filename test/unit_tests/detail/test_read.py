@@ -68,10 +68,14 @@ def test_check_head_chunk_wrong_type(mocker):
     ([b'fmt ', ], 16, WAVE_FORMAT_PCM, 0),
     ([b'fmt ', ], 18, WAVE_FORMAT_PCM, 0),
     ([b'fmt ', ], 40, WAVE_FORMAT_PCM, 0),
+    ([b'fmt ', ], 16, WAVE_FORMAT_IEEE_FLOAT, 0),
+    ([b'fmt ', ], 18, WAVE_FORMAT_IEEE_FLOAT, 0),
+    ([b'fmt ', ], 40, WAVE_FORMAT_IEEE_FLOAT, 0),
     # make sure it finds chunk after others
     ([b'fmt ', b'bar', b'RIFF', b'foo'], 16, WAVE_FORMAT_PCM, 0),
-    # cover WAVE_FORMAT_EXTENSIBLE for 24b PCM
-    ([b'fmt ', ], 40, WAVE_FORMAT_EXTENSIBLE, WAVE_FORMAT_PCM)
+    # cover WAVE_FORMAT_EXTENSIBLE for PCM
+    ([b'fmt ', ], 40, WAVE_FORMAT_EXTENSIBLE, WAVE_FORMAT_PCM),
+    ([b'fmt ', ], 40, WAVE_FORMAT_IEEE_FLOAT, WAVE_FORMAT_PCM)
 ])
 def test_get_fmt_chunk(fmt_names, chunk_size, format_tag,
                        sub_format_tag, mocker):
@@ -79,7 +83,7 @@ def test_get_fmt_chunk(fmt_names, chunk_size, format_tag,
     Test head chunk is read correctly
     """
     read_list = [struct.pack('<H', sub_format_tag),
-                 struct.pack('<HHLLHH', format_tag, 1, 2, 3, 4, 5)]
+                 struct.pack('<HHLLHH', format_tag, 1, 2, 3, 4, 32)]
     # mock Chunk methods
     mocker.patch.object(chunk.Chunk, '__init__', return_value=None)
     mocker.patch.object(chunk.Chunk, 'getname',
@@ -91,12 +95,13 @@ def test_get_fmt_chunk(fmt_names, chunk_size, format_tag,
                         side_effect=lambda _: read_list.pop())
     mocker.patch.object(chunk.Chunk, 'skip')
 
-    assert get_fmt_chunk(None, StreamHandler(True)) == FormatInfo(WAVE_FORMAT_PCM, 1, 2, 3, 4, 5)
+    expected_format = sub_format_tag if format_tag == WAVE_FORMAT_EXTENSIBLE else format_tag
+    assert get_fmt_chunk(None, StreamHandler(True)) == FormatInfo(expected_format, 1, 2, 3, 4, 32)
     # check all called as expected
     chunk.Chunk.__init__.assert_called_with(None, bigendian=False)
     chunk.Chunk.getname.assert_called_with()
     chunk.Chunk.getsize.assert_called_with()
-    if format_tag == WAVE_FORMAT_PCM:
+    if format_tag in SUPPORTED_WAVE_FORMATS:
         chunk.Chunk.read.assert_called_with(16)
     else:
         chunk.Chunk.read.assert_has_calls([mocker.call(16),
@@ -116,15 +121,20 @@ test_get_fmt_chunk_fail_args = 'fmt_names, chunk_size, format_tag, ' \
     # unsupported chunk size
     ([b'fmt ', ], 25, WAVE_FORMAT_PCM, 0,
      WaveFileIsCorrupted, 'Format chunk is of unexpected size: 25.'),
-    # unsupported wFormatTag = WAVE_FORMAT_IEEE_FLOAT
-    ([b'fmt ', ], 40, 0x0003, 0,
+    # unsupported wFormatTag = WAVE_FORMAT_ALAW
+    ([b'fmt ', ], 40, 0x0006, 0,
      WaveFileNotSupported, 'The wave format is not of supported type.'),
     # WAVE_FORMAT_EXTENSIBLE should have chunksize of 40
     ([b'fmt ', ], 18, WAVE_FORMAT_EXTENSIBLE, 0,
      WaveFileNotSupported, 'The wave format is not of supported type.'),
-    # unsupported subFormatTag = WAVE_FORMAT_IEEE_FLOAT
-    ([b'fmt ', ], 40, WAVE_FORMAT_EXTENSIBLE, 0x0003,
+    # unsupported subFormatTag = WAVE_FORMAT_ALAW
+    ([b'fmt ', ], 40, WAVE_FORMAT_EXTENSIBLE, 0x0006,
      WaveFileNotSupported, 'The wave format is not of supported type.'),
+    # unsupported subFormatTag = WAVE_FORMAT_ALAW
+    ([b'fmt ', ], 16, WAVE_FORMAT_PCM, 0,
+     WaveFileNotSupported, "Sample width '5' is not supported for given type."),
+    ([b'fmt ', ], 40, WAVE_FORMAT_EXTENSIBLE, WAVE_FORMAT_PCM,
+     WaveFileNotSupported, "Sample width '5' is not supported for given type.")
 ])
 def test_get_fmt_chunk_fail(fmt_names, chunk_size, format_tag,
                             sub_format_tag, exception_type, error_msg, mocker):
@@ -227,7 +237,7 @@ def test_get_data_from_chunk(format, dtype, mocker):
     assert get_data_from_chunk(chunk, format, handler) is data
     # check all called as expected
     chunk.getsize.assert_called_with()
-    handler.read_data.assert_called_with(chunk, data_size, format.wBitsPerSample // 8)
+    handler.read_data.assert_called_with(chunk, data_size, format.wBitsPerSample // 8, False)
     if format.nChannels > 1:
         data.reshape.assert_called_with(-1, format.nChannels)
 

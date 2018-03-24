@@ -31,13 +31,15 @@ def test_stream_handler_read(le, prefix, mocker):
     unpack.assert_called_with(prefix + 'LLL', 'stream', 0)
 
 
-@pytest.mark.parametrize('n_bytes, expected_dtype', [
-    (1, 'u1'),
-    (2, 'i2'),
-    (4, 'i4'),
-    (8, 'i8')
+@pytest.mark.parametrize('n_bytes, is_float, expected_dtype', [
+    (1, False, 'u1'),
+    (2, False, 'i2'),
+    (4, False, 'i4'),
+    (8, False, 'i8'),
+    (8, True, 'f8'),
+    (16, True, 'f16')
 ])
-def test_stream_handler_read_data_simple_type(n_bytes, expected_dtype, mocker):
+def test_stream_handler_read_data_simple_type(n_bytes, is_float, expected_dtype, mocker):
     """
     Test that StreamHandler reads data correctly for 8, 16, 32, and 64 bit
     """
@@ -48,7 +50,7 @@ def test_stream_handler_read_data_simple_type(n_bytes, expected_dtype, mocker):
 
     for le in [True, False]:
         handler = StreamHandler(le)
-        assert handler.read_data(stream, 10, n_bytes) == 'data'
+        assert handler.read_data(stream, 10, n_bytes, is_float) == 'data'
 
         prefix = '<' if le else '>'
         fromstring.assert_called_with('raw_data', dtype=prefix + expected_dtype)
@@ -71,8 +73,8 @@ def test_stream_handler_read_data_complex_type(le, n_bytes, mocker):
     stream.read.return_value = b'\n' + padding if le else padding + b'\n'
 
     handler = StreamHandler(le)
-    assert handler.read_data(stream, 2 * n_bytes, n_bytes) == 'data'
+    assert handler.read_data(stream, 2 * n_bytes, n_bytes, False) == 'data'
 
-    array.assert_called_with([10, 10])
+    array.assert_called_with([10, 10], dtype=numpy.int32 if n_bytes == 3 else numpy.int64)
     stream.read.assert_has_calls([mocker.call(n_bytes),
                                   mocker.call(n_bytes)])

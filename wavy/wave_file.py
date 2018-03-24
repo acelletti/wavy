@@ -61,8 +61,6 @@ class WaveFile(object):
             data (numpy.ndarray): Audio data.
             tags (Tags): Tags containing information about the audio.
         """
-        # check that sample width is supported
-        wavy.detail.check_sample_width_supported(sample_width)
 
         # copy simple info
         self._sample_width = sample_width
@@ -79,6 +77,9 @@ class WaveFile(object):
         # check array is not empty
         if not self._n_frames:
             raise wavy.WaveValueError("Data array cannot be empty.")
+
+        # check that sample width is supported for data dtype
+        wavy.detail.check_sample_width_supported(sample_width, data.dtype)
 
         # if we have tags, it must be a valid Tags obj
         if tags and not isinstance(tags, wavy.Tags):

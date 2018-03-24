@@ -15,7 +15,6 @@ FormatInfo = collections.namedtuple('FormatInfo', [
 ])
 
 
-
 def get_chunk(stream):
     """
     Get chunk for wave file (always little endian)
@@ -111,19 +110,29 @@ def get_fmt_chunk(stream, handler):
     # extract common chunk info into tuple
     info = FormatInfo(*handler.read('HHLLHH', chunk.read(16)))
 
-    # we only support PCM
-    if info.wFormatTag == WAVE_FORMAT_PCM:
+    format_tag = info.wFormatTag
+
+    # if format extensible is used, the format tag
+    # will be specified in the sub format
+    if format_tag == WAVE_FORMAT_EXTENSIBLE and \
+            chunk.getsize() == 40:
+        # get format tag
+        format_tag = get_sub_format(chunk, handler)
+        # replace tag in FormatInfo
+        info = FormatInfo(format_tag, *list(info)[1:])
+
+    # we only support PCM and FLOAT
+    if format_tag in SUPPORTED_WAVE_FORMATS:
+
+        # check that the sample width is supported for type
+        if info.wBitsPerSample not in \
+                SUPPORTED_SAMPLE_WIDTH_FOR_FORMAT[format_tag]:
+            raise wavy.WaveFileNotSupported(
+                "Sample width '{}' is not supported for "
+                "given type.".format(info.wBitsPerSample))
+
         chunk.skip()
         return info
-
-    # 24b PCM is encoded with WAVE_FORMAT_EXTENSIBLE and
-    # WAVE_FORMAT_PCM as subFormat
-    if info.wFormatTag == WAVE_FORMAT_EXTENSIBLE and \
-            chunk.getsize() == 40 and \
-            get_sub_format(chunk, handler) == WAVE_FORMAT_PCM:
-        chunk.skip()
-        # replace WAVE_FORMAT_PCM with PCM and return info
-        return FormatInfo(WAVE_FORMAT_PCM, *list(info)[1:])
 
     raise wavy.WaveFileNotSupported('The wave format is not of supported type.')
 
@@ -266,7 +275,8 @@ def get_data_from_chunk(chunk, format, handler):
     n_bytes = format.wBitsPerSample // 8
 
     # read data from raw
-    data = handler.read_data(chunk, size, n_bytes)
+    data = handler.read_data(chunk, size, n_bytes,
+                             format.wFormatTag == WAVE_FORMAT_IEEE_FLOAT)
 
     # check if there is more than one channel, if so reshape
     return data if format.nChannels == 1 \

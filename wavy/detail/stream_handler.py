@@ -39,7 +39,7 @@ class StreamHandler(object):
         """
         return struct.unpack_from(self.endian_prefix + format, stream, offset)
 
-    def read_data(self, stream, size, n_bytes):
+    def read_data(self, stream, size, n_bytes, is_float):
         """
         Read data from stream as a numpy array.
         Args:
@@ -53,8 +53,14 @@ class StreamHandler(object):
         """
         # the byte size is supported so we use numpy
         if n_bytes % 3 != 0:
-            # if 8 bits is unsigned, otherwise signed
-            dtype = f"{self.endian_prefix}{'i' if n_bytes > 1 else 'u'}{n_bytes}"
+            # float is always f
+            if is_float:
+                type = 'f'
+            else:
+                # if 8 bits is unsigned, otherwise signed
+                type = 'i' if n_bytes > 1 else 'u'
+            # compose dtype for parsing data
+            dtype = f"{self.endian_prefix}{type}{n_bytes}"
             # use numpy from string to read data
             return numpy.fromstring(stream.read(size), dtype=dtype)
         else:
@@ -64,7 +70,7 @@ class StreamHandler(object):
         """
         Read data from stream as a numpy array for 24 and 48 bit int
         (not supported by numpy.fromstring).
-        
+
         Args:
             stream: Stream to read from.
             size: Size of the data to read.
@@ -75,7 +81,8 @@ class StreamHandler(object):
 
         """
         # we need to add some padding so that we can read the bytes
-        padding = (4 - n_bytes % 4) * b'\x00'
+        n_padding = (4 - n_bytes % 4)
+        padding = n_padding * b'\x00'
         # go through the data manually with for loop
         data = []
         for _ in range(size // n_bytes):
@@ -84,4 +91,4 @@ class StreamHandler(object):
                               stream.read(n_bytes) + padding if self.little_endian else
                               padding + stream.read(n_bytes))
         # convert to numpy array
-        return numpy.array(data)
+        return numpy.array(data, dtype=numpy.dtype('i{}'.format(n_bytes + n_padding)))
