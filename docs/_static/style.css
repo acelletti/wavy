@@ -1,0 +1,23 @@
+
+.fa-check-circle {
+    color: green;
+}
+
+.fa-times-circle {
+    color: red;
+}
+
+td, th {
+    background-color: inherit !important;
+    border-left: solid 1px #e1e4e5;
+    border-right: solid 1px #e1e4e5;
+}
+
+.comparison td, th {
+    text-align: center;
+}
+
+td .fa {
+    font-size: 1.5em;
+}
+

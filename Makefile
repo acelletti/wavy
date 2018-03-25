@@ -5,8 +5,8 @@
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 SPHINXPROJ    = Wavy
-SOURCEDIR     = docs/source
-BUILDDIR      = docs/build
+SOURCEDIR     = docs
+BUILDDIR      = docs_build
 
 # Put it first so that "make" without argument is like "make help".
 help:
