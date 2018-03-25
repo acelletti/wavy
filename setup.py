@@ -11,18 +11,20 @@ from setuptools import setup, find_packages
 from codecs import open
 from os import path
 
+import versioneer
+
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
 with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-
 setup(
     # project name
     name='wavy',
     # project version
-    version='0.1.0',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     # short description
     description='A pure python module for working with WAVE files with '
                 'support for all common file formats for both RIFF and RIFX.',
@@ -64,7 +66,7 @@ setup(
     keywords='audio wave wav',
 
     # specify package
-    packages=['wavy'],
+    packages=['wavy', 'wavy.detail'],
 
     # required packages
     install_requires=['numpy'],
