@@ -7,6 +7,8 @@ filter:
     excluded_paths:
         - docs/*
         - test/*
+        - versioneer.py
+        - wavy/_versioneer.py
 
 build:
     environment:
