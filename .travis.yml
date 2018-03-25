@@ -1,15 +1,19 @@
 language: python
-
 python:
-  - "3.6"
-
+- '3.6'
 install:
-  - pip install -r requirements.txt
-  - pip install coverage coveralls
-
+- pip install -r requirements.txt
+- pip install coverage coveralls
 script:
-  - coverage run -m --branch pytest -vs test
-  - coverage report -m
-
+- coverage run -m --branch pytest -vs test
+- coverage report -m
 after_success:
-  - coveralls
+- coveralls
+
+deploy:
+  provider: pypi
+  user: "acelletti"
+  password:
+    secure: KN+Ln4xFtjKJX2+DSI0YyGDoDEMDuUPa6ba/RamErYcIhwoxo8exDkCuilqwWFCGuLa2Hq8yOLRu303zM5Co/UOSHbiSd35JQeBhm0LO4zWXO07Z5XzYt81RCUx92AKTn1DzMIQSM0WDz11CqDYw0h1BKWxxS0INyUHU7tnxhvhnEuf1HIMRe9BkWslI/uMEHokCL23MmWAZkUhDDQOPCtfuYrdpD46q9BeNQm+MUxQrCQsmqBauyebo8Ox8q9p+3cQ42vV3/un+rx1KgHIYiSIK0cnALZBYZ5DhUkDE/+q9ECUZrumI81mOl4o/u3sdoNH1XU5U/R0x/mewvpgS+krS0v1907qJiG75caK6PQo04e6W6kkS/VHLyfv3nOpWs4ySRpXP/rPnHUeUQcxbMBGEJMghTfBrLkOS2ZsjeF7jNma8d/KQbzZ9gshCj+DoPpMxV6Rh0XzdR3SBLkAF3hzXS5gFT4JdkcI2wY0T6np7EfdX0Cuojji9QeqLCoX+9VBcMAvzZ+pYx2UFSUKYtDo5dLhtidHBXCYha4wumVqoqWf0IsPmOyHD51xkBvGdExnUrrCvDKNtYyfhY4KBF6Hh9BxBtNtW0Yu0sW6SFUN6aPv0TVSk6HUDyvALb/pALeGfMW1DYFD+YZYNuUDLUIWKCUZUNOvVG/KDiRQYf68=
+  on:
+    tags: true
