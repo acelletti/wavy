@@ -15,18 +15,22 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath('../..'))
+sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 
 project = 'Wavy'
-copyright = '2018, Andrea Celletti'
+copyright = '2019, Andrea Celletti'
 author = 'Andrea Celletti'
 
+from wavy._version import get_versions
+version = get_versions()['version'].split('+')[0]
+del get_versions
+
 # The short X.Y version
-version = ''
+# version = ''
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+# release = '0.0.1'
 
 # -- General configuration ---------------------------------------------------
 
