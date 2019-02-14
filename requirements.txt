@@ -18,7 +18,7 @@ pyparsing==2.2.0
 pytest==3.4.2
 pytest-mock==1.7.1
 pytz==2018.3
-requests==2.18.4
+requests==2.20.0
 scipy==1.0.0
 six==1.11.0
 snowballstemmer==1.2.1
@@ -26,5 +26,5 @@ Sphinx==1.7.1
 sphinx-fontawesome==0.0.6
 sphinx-rtd-theme==0.2.4
 sphinxcontrib-websupport==1.0.1
-urllib3==1.22
+urllib3==1.23
 versioneer==0.18

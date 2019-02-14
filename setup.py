@@ -69,7 +69,10 @@ setup(
     packages=['wavy', 'wavy.detail'],
 
     # required packages
-    install_requires=['numpy'],
+    install_requires=[
+        'python>=3.6'
+        'numpy'
+    ],
 
     # extra required packages
     extras_require={
