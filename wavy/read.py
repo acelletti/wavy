@@ -4,6 +4,16 @@ import wavy.detail
 
 
 def read(file):
+    """
+    Read the the audio file.
+
+    Args:
+        file (str or File): Either the path to the file or an instance of File.
+
+    Returns:
+        WaveFile: An object that represents the file.
+
+    """
     # get buffer reader, already opened for us
     with wavy.detail.get_stream_from_file(file, 'rb', io.BufferedReader) as \
             stream:

@@ -9,9 +9,22 @@ WaveFileInfo = collections.namedtuple('WaveFileInfo', [
     'n_frames',
     'tags'
 ])
+"""
+Named tuple that represent information about the WAVE file.
+"""
 
 
 def info(file):
+    """
+    Returns information about the audio file.
+
+    Args:
+        file (str or File): Either the path to the file or an instance of File.
+
+    Returns:
+        WaveFileInfo: Information about the file.
+
+    """
     # get buffer reader, already opened for us
     with wavy.detail.get_stream_from_file(file, 'rb', io.BufferedReader) as \
             stream:
