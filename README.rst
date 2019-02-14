@@ -13,6 +13,9 @@ Wavy
 .. image:: https://img.shields.io/github/license/acelletti/wavy.svg
    :target: https://opensource.org/licenses/MIT
 
+.. image:: https://readthedocs.org/projects/wavy/badge/?version=latest
+   :target: https://wavy.readthedocs.io/en/latest/?badge=latest
+
 Introduction
 ------------
 
