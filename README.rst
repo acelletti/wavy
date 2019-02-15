@@ -42,7 +42,7 @@ flexibility and ease of use are desirable.
                   :scale: 150%
 
 Comparison
-^^^^^^^
+^^^^^^^^^^^
 
 The following table shows a comparison of supported functionality:
 
@@ -84,7 +84,7 @@ The following table shows a comparison of supported formats for uncompressed WAV
    +--------------+------------+----------------+----------------+----------------+
 
 Installation
--------
+-------------
 
 The latest stable version is available on `PyPI <https://pypi.org/project/wavy/>`_.
 
@@ -98,7 +98,7 @@ Usage
 -------
 
 Read File
-^^^^^^^
+^^^^^^^^^^
 
 Open a file using the module use ``wavy.read``:
 
@@ -126,7 +126,7 @@ Get the data for the file:
 
 
 Get File Info
-^^^^^^^
+^^^^^^^^^^^^^
 
 To read the file information without loading the data use ``wavy.info``:
 
