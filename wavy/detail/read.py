@@ -20,7 +20,7 @@ def get_chunk(stream, bigendian):
     Get chunk for wave file (always little endian)
     """
     try:
-        return chunk.Chunk(stream, bigendian)
+        return chunk.Chunk(stream, bigendian = bigendian)
     except EOFError:
         raise wavy.WaveFileIsCorrupted('Reached end of file prematurely.')
 
