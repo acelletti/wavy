@@ -83,12 +83,18 @@ class StreamHandler(object):
         # we need to add some padding so that we can read the bytes
         n_padding = (4 - n_bytes % 4)
         padding = n_padding * b'\x00'
+        npadding = (n_padding * b'\xff')
         # go through the data manually with for loop
         data = []
         for _ in range(size // n_bytes):
             # need to pad depending on the endianness
-            data += self.read('i' if n_bytes == 3 else 'q',
-                              stream.read(n_bytes) + padding if self.little_endian else
-                              padding + stream.read(n_bytes))
+            sdata = stream.read(n_bytes)
+            if self.little_endian:
+                if sdata[-1] & 0x80: sdata = sdata + npadding
+                else: sdata = sdata + padding
+            else:
+                if sdata[0] & 0x80: sdata = npadding + sdata
+                else: sdata = padding + sdata
+            data += self.read('i' if n_bytes == 3 else 'q', sdata)
         # convert to numpy array
         return numpy.array(data, dtype=numpy.dtype('i{}'.format(n_bytes + n_padding)))

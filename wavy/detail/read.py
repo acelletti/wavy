@@ -15,12 +15,12 @@ FormatInfo = collections.namedtuple('FormatInfo', [
 ])
 
 
-def get_chunk(stream):
+def get_chunk(stream, bigendian):
     """
     Get chunk for wave file (always little endian)
     """
     try:
-        return chunk.Chunk(stream, bigendian=False)
+        return chunk.Chunk(stream, bigendian = bigendian)
     except EOFError:
         raise wavy.WaveFileIsCorrupted('Reached end of file prematurely.')
 
@@ -92,7 +92,7 @@ def get_fmt_chunk(stream, handler):
     """
     # iterate through chunks until we find format
     while True:
-        chunk = get_chunk(stream)
+        chunk = get_chunk(stream, False if handler.little_endian else True)
         name = chunk.getname()
         # found format
         if name == FMT:
@@ -149,7 +149,8 @@ def check_format_info(info):
 
     """
     # check that block align matches bits per sample
-    block_align = int(info.wBitsPerSample / 4)
+    # BlockAlign == NumChannels * BitsPerSample/8
+    block_align = int(info.wBitsPerSample * info.nChannels/ 8)
     if block_align != info.nBlockAlign:
         raise wavy.WaveFileIsCorrupted(
             f"Block align is incorrect for {info.wBitsPerSample} bits. "
@@ -165,7 +166,7 @@ def check_format_info(info):
             f"Actual: {info.nAvgBytesPerSec}.")
 
 
-def get_data_chunk(stream, info_tags={}):
+def get_data_chunk(stream, info_tags={}, big_endian = False):
     """
     Reads the data chunk from the stream.
 
@@ -181,7 +182,7 @@ def get_data_chunk(stream, info_tags={}):
     """
     # iterate through chunks until we find data
     while True:
-        chunk = get_chunk(stream)
+        chunk = get_chunk(stream, big_endian)
         name = chunk.getname()
         # found data
         if name == DATA:
@@ -304,7 +305,7 @@ def read_stream(stream, read_data=True):
     # create info dict to store optional info
     info_tags = {}
     # get data chunk
-    data_chunk = get_data_chunk(stream, info_tags)
+    data_chunk = get_data_chunk(stream, info_tags, False if handler.little_endian else True)
     # build info obj from tags (if any was found)
     info = get_info_from_tags_dict(info_tags) \
         if info_tags else None
